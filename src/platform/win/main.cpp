@@ -645,6 +645,22 @@ int checkLanguage() {
     return str - STR_LANG_EN;
 }
 
+static void toggleFullscreen(){
+    static WINDOWPLACEMENT pLast;
+    DWORD style = GetWindowLong(hWnd, GWL_STYLE);
+    if (style & WS_OVERLAPPEDWINDOW) {
+        MONITORINFO mInfo = { sizeof(mInfo) };
+        if (GetWindowPlacement(hWnd, &pLast) && GetMonitorInfo(MonitorFromWindow(hWnd, MONITOR_DEFAULTTOPRIMARY), &mInfo)) {
+            RECT &r = mInfo.rcMonitor;
+            SetWindowLong(hWnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
+            MoveWindow(hWnd, r.left, r.top, r.right - r.left, r.bottom - r.top, FALSE);
+        }
+    } else {
+        SetWindowLong(hWnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
+        SetWindowPlacement(hWnd, &pLast);
+    }
+}
+
 static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     switch (msg) {
         // window
@@ -685,19 +701,7 @@ static LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lPara
         case WM_SYSKEYDOWN :
         case WM_SYSKEYUP   :
             if (msg == WM_SYSKEYDOWN && wParam == VK_RETURN) { // Alt + Enter - switch to fullscreen or window
-                static WINDOWPLACEMENT pLast;
-                DWORD style = GetWindowLong(hWnd, GWL_STYLE);
-                if (style & WS_OVERLAPPEDWINDOW) {
-                    MONITORINFO mInfo = { sizeof(mInfo) };
-                    if (GetWindowPlacement(hWnd, &pLast) && GetMonitorInfo(MonitorFromWindow(hWnd, MONITOR_DEFAULTTOPRIMARY), &mInfo)) {
-                        RECT &r = mInfo.rcMonitor;
-                        SetWindowLong(hWnd, GWL_STYLE, style & ~WS_OVERLAPPEDWINDOW);
-                        MoveWindow(hWnd, r.left, r.top, r.right - r.left, r.bottom - r.top, FALSE);
-                    }
-                } else {
-                    SetWindowLong(hWnd, GWL_STYLE, style | WS_OVERLAPPEDWINDOW);
-                    SetWindowPlacement(hWnd, &pLast);
-                }
+                toggleFullscreen();
                 break;
             }
             if (msg == WM_SYSKEYDOWN && wParam == VK_F4) { // Alt + F4 - close application
@@ -991,13 +995,17 @@ int main(int argc, char** argv) {
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDOUT);
     _CrtMemCheckpoint(&_msBegin);
+    bool start_fullscreen=false;
 //#elif PROFILE
 #elif PROFILE
 int main(int argc, char** argv) {
+    bool start_fullscreen=false;
 #else
+#include <cstring>
 int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
     int argc = (lpCmdLine && strlen(lpCmdLine)) ? 2 : 1;
     const char *argv[] = { "", lpCmdLine };
+    bool start_fullscreen=(strstr(lpCmdLine,"--fullscreen")!=NULL);
 #endif
     cacheDir[0] = saveDir[0] = contentDir[0] = 0;
 
@@ -1093,6 +1101,10 @@ int CALLBACK WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLi
         MessageBoxA(hWnd, "Please check the readme file first!", "Game resources not found", MB_ICONHAND);
     } else {
         ShowWindow(hWnd, SW_SHOWDEFAULT);
+    }
+
+    if(start_fullscreen){
+        toggleFullscreen();
     }
 
     MSG msg;
